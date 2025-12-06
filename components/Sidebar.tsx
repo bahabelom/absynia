@@ -1,8 +1,41 @@
+'use client';
+
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { LayoutDashboard, BookOpen, User, Settings, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/Button"
+import { useAuthContext } from "@/lib/firebase/AuthProvider"
+import { signOut } from "@/lib/firebase/auth"
 
 export function Sidebar() {
+    const router = useRouter()
+    const { user, userProfile, loading } = useAuthContext()
+
+    const handleLogout = async () => {
+        try {
+            await signOut()
+            router.push('/login')
+            router.refresh()
+        } catch (error) {
+            console.error('Logout error:', error)
+        }
+    }
+
+    if (loading) {
+        return (
+            <aside className="w-64 bg-white border-r border-gray-100 hidden md:flex flex-col h-screen sticky top-0">
+                <div className="p-6 flex flex-col items-center border-b border-gray-50">
+                    <div className="h-24 w-24 rounded-full bg-gray-100 mb-4 animate-pulse" />
+                    <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mb-2" />
+                    <div className="h-3 w-40 bg-gray-100 rounded animate-pulse" />
+                </div>
+            </aside>
+        )
+    }
+
+    const displayName = userProfile?.displayName || user?.displayName || 'User'
+    const email = user?.email || ''
+
     return (
         <aside className="w-64 bg-white border-r border-gray-100 hidden md:flex flex-col h-screen sticky top-0">
             <div className="p-6 flex flex-col items-center border-b border-gray-50">
@@ -12,11 +45,10 @@ export function Sidebar() {
                         <User className="h-12 w-12 text-orange-300" />
                     </div>
                     {/* In a real app, use Image component */}
-                    {/* <Image src="/avatar.png" alt="Abebe Bikila" fill className="object-cover" /> */}
+                    {/* {user?.photoURL && <Image src={user.photoURL} alt={displayName} fill className="object-cover" />} */}
                 </div>
-                <h2 className="text-lg font-bold text-gray-900">Abebe Bikila</h2>
-                <p className="text-sm text-primary">abebe.b@aastu.edu.et</p>
-                <p className="text-xs text-gray-500 mt-1">Addis Ababa University</p>
+                <h2 className="text-lg font-bold text-gray-900">{displayName}</h2>
+                <p className="text-sm text-primary">{email}</p>
             </div>
 
             <nav className="flex-1 p-4 space-y-2">
@@ -42,7 +74,7 @@ export function Sidebar() {
             </nav>
 
             <div className="p-4 space-y-2 border-t border-gray-50">
-                <Link href="/profile/edit">
+                <Link href="/profile">
                     <Button className="w-full bg-primary hover:bg-primary/90 text-white mb-6">
                         Edit Profile
                     </Button>
@@ -54,12 +86,14 @@ export function Sidebar() {
                         Settings
                     </Button>
                 </Link>
-                <Link href="/logout">
-                    <Button variant="ghost" className="w-full justify-start text-gray-600 hover:bg-gray-50 hover:text-gray-900">
-                        <LogOut className="mr-3 h-5 w-5" />
-                        Log Out
-                    </Button>
-                </Link>
+                <Button 
+                    variant="ghost" 
+                    className="w-full justify-start text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    onClick={handleLogout}
+                >
+                    <LogOut className="mr-3 h-5 w-5" />
+                    Log Out
+                </Button>
             </div>
         </aside>
     )

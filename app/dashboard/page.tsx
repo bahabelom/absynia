@@ -1,11 +1,42 @@
+'use client';
+
+import { useAuthContext } from "@/lib/firebase/AuthProvider"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import Link from "next/link"
 import { Navbar } from "@/components/ui/Navbar"
 import { Footer } from "@/components/ui/Footer"
 import { Button } from "@/components/ui/Button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card"
-import { Plus, FileText, Clock, MoreVertical, BookOpen, BrainCircuit, GraduationCap } from "lucide-react"
+import { Plus, FileText, Clock, MoreVertical, BookOpen, BrainCircuit, GraduationCap, Star, Quote } from "lucide-react"
 
 export default function Dashboard() {
+    const { user, userProfile, loading, isAuthenticated } = useAuthContext()
+    const router = useRouter()
+
+    useEffect(() => {
+        if (!loading && !isAuthenticated) {
+            router.push('/login?callbackUrl=/dashboard')
+        }
+    }, [loading, isAuthenticated, router])
+
+    if (loading) {
+        return (
+            <div className="flex min-h-screen flex-col bg-gray-50 font-sans text-foreground items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (!isAuthenticated) {
+        return null
+    }
+
+    const userName = userProfile?.displayName || user?.displayName || 'User'
+
     // Mock data for recent uploads
     const recentUploads = [
         { id: 1, title: "Introduction to Economics", date: "2 hours ago", pages: 142, progress: 15 },
@@ -22,7 +53,7 @@ export default function Dashboard() {
                     {/* Header Section */}
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold tracking-tight">Welcome back, Abebe</h1>
+                            <h1 className="text-3xl font-bold tracking-tight">Welcome back, {userName.split(' ')[0]}</h1>
                             <p className="text-gray-500">
                                 Ready to continue learning? Here's what's happening.
                             </p>
@@ -140,6 +171,81 @@ export default function Dashboard() {
                             </Link>
                         </div>
                     </div>
+
+                    {/* Success Stories Section */}
+                    <section className="py-12 space-y-8">
+                        <div className="text-center">
+                            <h2 className="text-3xl font-bold text-gray-900 mb-4">Success Stories</h2>
+                            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                                See how students are improving their grades with AI Mentor
+                            </p>
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-6">
+                            <Card className="p-6">
+                                <div className="flex items-center gap-1 mb-4">
+                                    {[...Array(5)].map((_, i) => (
+                                        <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                                    ))}
+                                </div>
+                                <Quote className="h-8 w-8 text-teal-600 mb-4" />
+                                <p className="text-gray-700 mb-4 italic">
+                                    "AI Mentor helped me understand complex economics concepts that I struggled with for months. My grades improved from C+ to A- in just one semester!"
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center">
+                                        <span className="text-teal-600 font-bold">AM</span>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900">Alemayehu M.</p>
+                                        <p className="text-sm text-gray-500">Grade 12 Student, Addis Ababa</p>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <Card className="p-6">
+                                <div className="flex items-center gap-1 mb-4">
+                                    {[...Array(5)].map((_, i) => (
+                                        <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                                    ))}
+                                </div>
+                                <Quote className="h-8 w-8 text-teal-600 mb-4" />
+                                <p className="text-gray-700 mb-4 italic">
+                                    "The AI tutor is available 24/7 and explains everything in a way that makes sense. I've saved so much time and my understanding of physics has dramatically improved."
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center">
+                                        <span className="text-teal-600 font-bold">SM</span>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900">Sara M.</p>
+                                        <p className="text-sm text-gray-500">University Student, Hawassa</p>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            <Card className="p-6">
+                                <div className="flex items-center gap-1 mb-4">
+                                    {[...Array(5)].map((_, i) => (
+                                        <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                                    ))}
+                                </div>
+                                <Quote className="h-8 w-8 text-teal-600 mb-4" />
+                                <p className="text-gray-700 mb-4 italic">
+                                    "I love how I can upload my textbooks and ask questions anytime. The progress tracking keeps me motivated. Best study tool I've ever used!"
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center">
+                                        <span className="text-teal-600 font-bold">DT</span>
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-gray-900">Daniel T.</p>
+                                        <p className="text-sm text-gray-500">Grade 11 Student, Bahir Dar</p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    </section>
                 </div>
             </main>
 
