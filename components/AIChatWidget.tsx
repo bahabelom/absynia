@@ -6,30 +6,13 @@ import { Button } from "@/components/ui/Button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card"
 import { MessageCircle, X, Send, Bot, User, Globe, Sparkles, Loader2, Plus, MessageSquare, History } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-
-type Message = {
-    id: string
-    role: 'user' | 'assistant'
-    text: string
-    timestamp?: number
-}
+import { useAuth } from "@/lib/firebase/hooks"
+import { getConversations, saveConversations, deleteConversation, updateConversation, type Conversation, type Message } from "@/lib/services/conversation.service"
 
 type Language = {
     code: string
     name: string
     flag: string
-}
-
-type Conversation = {
-    id: string
-    title: string
-    messages: Message[]
-    createdAt: number
-    updatedAt: number
-}
-
-type ConversationHistory = {
-    [courseId: string]: Conversation[]
 }
 
 const languages: Language[] = [
@@ -49,33 +32,6 @@ const getInitialGreeting = (languageCode: string): string => {
     return greetings[languageCode] || greetings.en
 }
 
-// Storage key for conversations
-const STORAGE_KEY = 'ai-chat-conversations'
-
-// Helper functions for localStorage
-const getConversations = (courseId: string): Conversation[] => {
-    if (typeof window === 'undefined') return []
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY)
-        if (!stored) return []
-        const allConversations: ConversationHistory = JSON.parse(stored)
-        return allConversations[courseId] || []
-    } catch {
-        return []
-    }
-}
-
-const saveConversations = (courseId: string, conversations: Conversation[]) => {
-    if (typeof window === 'undefined') return
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY)
-        const allConversations: ConversationHistory = stored ? JSON.parse(stored) : {}
-        allConversations[courseId] = conversations
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(allConversations))
-    } catch (error) {
-        console.error('Failed to save conversations:', error)
-    }
-}
 
 const generateConversationTitle = (firstMessage: string): string => {
     const maxLength = 40
@@ -87,6 +43,7 @@ const generateConversationTitle = (firstMessage: string): string => {
 export function AIChatWidget() {
     const params = useParams()
     const courseId = (params?.id as string) || 'default'
+    const { user, loading: authLoading } = useAuth()
     
     const [isOpen, setIsOpen] = useState(false)
     const [selectedLanguage, setSelectedLanguage] = useState<Language>(languages[0])
@@ -99,6 +56,7 @@ export function AIChatWidget() {
     ])
     const [inputValue, setInputValue] = useState("")
     const [isTyping, setIsTyping] = useState(false)
+    const [loadingConversations, setLoadingConversations] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const languageDropdownRef = useRef<HTMLDivElement>(null)
     const historyDropdownRef = useRef<HTMLDivElement>(null)
@@ -108,24 +66,50 @@ export function AIChatWidget() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
 
-    // Load conversations for this course
+    // Load conversations for this course from Firestore
     useEffect(() => {
-        const loaded = getConversations(courseId)
-        setConversations(loaded)
-    }, [courseId])
+        if (!user || authLoading) return
 
-    // Save messages to current conversation
-    useEffect(() => {
-        if (messages.length > 1 && currentConversationId) {
-            const updated = conversations.map(conv => 
-                conv.id === currentConversationId
-                    ? { ...conv, messages, updatedAt: Date.now() }
-                    : conv
-            )
-            setConversations(updated)
-            saveConversations(courseId, updated)
+        const loadConversations = async () => {
+            setLoadingConversations(true)
+            try {
+                const loaded = await getConversations(user.uid, courseId)
+                setConversations(loaded)
+            } catch (error) {
+                console.error('Error loading conversations:', error)
+            } finally {
+                setLoadingConversations(false)
+            }
         }
-    }, [messages, currentConversationId, courseId])
+
+        loadConversations()
+    }, [courseId, user, authLoading])
+
+    // Save messages to current conversation in Firestore
+    useEffect(() => {
+        if (!user || messages.length <= 1 || !currentConversationId) return
+
+        const saveMessages = async () => {
+            try {
+                setConversations(prevConversations => {
+                    const updated = prevConversations.map(conv => 
+                        conv.id === currentConversationId
+                            ? { ...conv, messages, updatedAt: Date.now() }
+                            : conv
+                    )
+                    // Save to Firestore asynchronously
+                    saveConversations(user.uid, courseId, updated).catch(error => {
+                        console.error('Error saving messages:', error)
+                    })
+                    return updated
+                })
+            } catch (error) {
+                console.error('Error saving messages:', error)
+            }
+        }
+
+        saveMessages()
+    }, [messages, currentConversationId, courseId, user])
 
     useEffect(() => {
         scrollToBottom()
@@ -183,14 +167,20 @@ export function AIChatWidget() {
         }
     }
 
-    const handleDeleteConversation = (conversationId: string, e: React.MouseEvent) => {
+    const handleDeleteConversation = async (conversationId: string, e: React.MouseEvent) => {
         e.stopPropagation()
-        const updated = conversations.filter(c => c.id !== conversationId)
-        setConversations(updated)
-        saveConversations(courseId, updated)
-        
-        if (currentConversationId === conversationId) {
-            handleNewChat()
+        if (!user) return
+
+        try {
+            const updated = conversations.filter(c => c.id !== conversationId)
+            setConversations(updated)
+            await saveConversations(user.uid, courseId, updated)
+            
+            if (currentConversationId === conversationId) {
+                handleNewChat()
+            }
+        } catch (error) {
+            console.error('Error deleting conversation:', error)
         }
     }
 
@@ -198,6 +188,11 @@ export function AIChatWidget() {
         if (!inputValue.trim()) return
 
         // Create new conversation if this is the first user message
+        if (!user) {
+            alert('Please sign in to save conversations')
+            return
+        }
+
         if (!currentConversationId && messages.length === 1 && messages[0].role === 'assistant') {
             const newConv: Conversation = {
                 id: Date.now().toString(),
@@ -209,7 +204,11 @@ export function AIChatWidget() {
             const updated = [newConv, ...conversations]
             setConversations(updated)
             setCurrentConversationId(newConv.id)
-            saveConversations(courseId, updated)
+            try {
+                await saveConversations(user.uid, courseId, updated)
+            } catch (error) {
+                console.error('Error saving new conversation:', error)
+            }
         }
 
         const newUserMessage: Message = {
@@ -252,7 +251,7 @@ export function AIChatWidget() {
             setMessages(prev => [...prev, newAiMessage])
             
             // Update conversation title if it's still the default
-            if (currentConversationId) {
+            if (currentConversationId && user) {
                 const conv = conversations.find(c => c.id === currentConversationId)
                 if (conv && conv.title === generateConversationTitle(userInput)) {
                     const updated = conversations.map(c => 
@@ -261,7 +260,11 @@ export function AIChatWidget() {
                             : c
                     )
                     setConversations(updated)
-                    saveConversations(courseId, updated)
+                    try {
+                        await saveConversations(user.uid, courseId, updated)
+                    } catch (error) {
+                        console.error('Error updating conversation title:', error)
+                    }
                 }
             }
         } catch (error) {
