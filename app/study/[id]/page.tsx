@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/ui/Navbar"
@@ -10,7 +10,7 @@ import { FileText, BrainCircuit, BookOpen, GraduationCap, ChevronLeft, ChevronRi
 import { motion, AnimatePresence } from "framer-motion"
 import { AIChatWidget } from "@/components/AIChatWidget"
 
-export default function StudyPage() {
+function StudyPageContent() {
     const params = useParams()
     const searchParams = useSearchParams()
     const initialTab = searchParams.get('tab') || 'summary'
@@ -328,5 +328,20 @@ export default function StudyPage() {
             </div>
             <AIChatWidget />
         </div>
+    )
+}
+
+export default function StudyPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex h-screen items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading...</p>
+                </div>
+            </div>
+        }>
+            <StudyPageContent />
+        </Suspense>
     )
 }
