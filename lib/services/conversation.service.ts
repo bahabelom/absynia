@@ -11,6 +11,7 @@ import {
   where,
   getDocs,
   Timestamp,
+  FieldValue,
 } from 'firebase/firestore';
 
 export type Message = {
@@ -32,7 +33,7 @@ type ConversationDocument = {
   conversations: Conversation[];
   userId: string;
   courseId: string;
-  updatedAt: Timestamp | number;
+  updatedAt: Timestamp | number | FieldValue;
 };
 
 /**
