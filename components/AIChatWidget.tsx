@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/Button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card"
-import { MessageCircle, X, Send, Bot, User } from "lucide-react"
+import { MessageCircle, X, Send, Bot, User, Globe, Sparkles, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 type Message = {
@@ -12,14 +12,40 @@ type Message = {
     text: string
 }
 
+type Language = {
+    code: string
+    name: string
+    flag: string
+}
+
+const languages: Language[] = [
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'am', name: 'Amharic', flag: '🇪🇹' },
+    { code: 'om', name: 'Afan Oromo', flag: '🇪🇹' },
+    { code: 'ti', name: 'Tigrinya', flag: '🇪🇹' },
+]
+
+const getInitialGreeting = (languageCode: string): string => {
+    const greetings: Record<string, string> = {
+        en: 'Hello! I am your AI study assistant. Ask me anything about this chapter!',
+        am: 'ሰላም! እኔ የእርስዎ AI የትምህርት ረዳት ነኝ። ስለዚህ ምዕራፍ ማንኛውንም ነገር ይጠይቁኝ!',
+        om: 'Akkam! Ani gargaarsa qo\'annoo AI keessan. Waa\'ee kutaa kanaa waan hunda na gaafadhu!',
+        ti: 'ሰላም! ኣነ ናይ እርስዎ AI መማህርቲ ሓጋዚ እየ። ብዛዕባ እዚ ምዕራፍ እዚ ነገር ዝዀነ ይሓትቱኒ!',
+    }
+    return greetings[languageCode] || greetings.en
+}
+
 export function AIChatWidget() {
     const [isOpen, setIsOpen] = useState(false)
+    const [selectedLanguage, setSelectedLanguage] = useState<Language>(languages[0])
+    const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false)
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', role: 'assistant', text: 'Hello! I am your AI study assistant. Ask me anything about this chapter!' }
+        { id: '1', role: 'assistant', text: getInitialGreeting('en') }
     ])
     const [inputValue, setInputValue] = useState("")
     const [isTyping, setIsTyping] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const languageDropdownRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -28,6 +54,34 @@ export function AIChatWidget() {
     useEffect(() => {
         scrollToBottom()
     }, [messages, isOpen])
+
+    // Close language dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
+                setIsLanguageDropdownOpen(false)
+            }
+        }
+
+        if (isLanguageDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside)
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [isLanguageDropdownOpen])
+
+    // Update greeting when language changes
+    useEffect(() => {
+        if (messages.length === 1 && messages[0].role === 'assistant') {
+            setMessages([{
+                id: '1',
+                role: 'assistant',
+                text: getInitialGreeting(selectedLanguage.code)
+            }])
+        }
+    }, [selectedLanguage])
 
     const handleSendMessage = async () => {
         if (!inputValue.trim()) return
@@ -39,29 +93,46 @@ export function AIChatWidget() {
         }
 
         setMessages(prev => [...prev, newUserMessage])
+        const userInput = inputValue
         setInputValue("")
         setIsTyping(true)
 
-        // Mock AI response
-        setTimeout(() => {
-            const responses = [
-                "That's a great question! Based on the chapter summary, scarcity is the fundamental economic problem.",
-                "Opportunity cost is what you give up when you make a choice. For example, if you study now, you give up leisure time.",
-                "Supply and demand interact to determine the market price.",
-                "Factors of production include Land, Labor, Capital, and Entrepreneurship.",
-                "I can help you create more flashcards if you like!"
-            ]
-            const randomResponse = responses[Math.floor(Math.random() * responses.length)]
+        try {
+            const response = await fetch('/api/ask-ai', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: userInput,
+                    language: selectedLanguage.code,
+                }),
+            })
 
+            if (!response.ok) {
+                throw new Error('Failed to get AI response')
+            }
+
+            const data = await response.json()
+            
             const newAiMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
-                text: randomResponse
+                text: data.aiReply
             }
 
             setMessages(prev => [...prev, newAiMessage])
+        } catch (error) {
+            console.error('Error fetching AI response:', error)
+            const errorMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                text: 'Sorry, I encountered an error. Please try again later.'
+            }
+            setMessages(prev => [...prev, errorMessage])
+        } finally {
             setIsTyping(false)
-        }, 1500)
+        }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -69,6 +140,11 @@ export function AIChatWidget() {
             e.preventDefault()
             handleSendMessage()
         }
+    }
+
+    const handleLanguageChange = (language: Language) => {
+        setSelectedLanguage(language)
+        setIsLanguageDropdownOpen(false)
     }
 
     return (
@@ -93,14 +169,60 @@ export function AIChatWidget() {
                                         <p className="text-xs text-primary-foreground/80">Always here to help</p>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-white hover:bg-white/20 h-8 w-8 p-0"
-                                    onClick={() => setIsOpen(false)}
-                                >
-                                    <X className="h-5 w-5" />
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    {/* Language Selector */}
+                                    <div className="relative" ref={languageDropdownRef}>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-white hover:bg-white/20 h-8 px-2"
+                                            onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                                        >
+                                            <Globe className="h-4 w-4 mr-1" />
+                                            <span className="text-xs">{selectedLanguage.flag}</span>
+                                        </Button>
+                                        
+                                        <AnimatePresence>
+                                            {isLanguageDropdownOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -10 }}
+                                                    className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50"
+                                                >
+                                                    <div className="max-h-64 overflow-y-auto">
+                                                        {languages.map((lang) => (
+                                                            <button
+                                                                key={lang.code}
+                                                                onClick={() => handleLanguageChange(lang)}
+                                                                className={`
+                                                                    w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors
+                                                                    flex items-center gap-2
+                                                                    ${selectedLanguage.code === lang.code ? 'bg-primary/10 text-primary font-medium' : 'text-gray-700'}
+                                                                `}
+                                                            >
+                                                                <span className="text-lg">{lang.flag}</span>
+                                                                <span>{lang.name}</span>
+                                                                {selectedLanguage.code === lang.code && (
+                                                                    <span className="ml-auto text-primary">✓</span>
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                    
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-white hover:bg-white/20 h-8 w-8 p-0"
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        <X className="h-5 w-5" />
+                                    </Button>
+                                </div>
                             </CardHeader>
 
                             <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
