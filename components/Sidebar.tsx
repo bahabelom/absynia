@@ -20,18 +20,25 @@ export function Sidebar() {
             </div>
 
             <nav className="flex-1 p-4 space-y-2">
-                <Link href="/">
+                <Link href="/dashboard">
                     <Button variant="ghost" className="w-full justify-start bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary font-medium">
                         <LayoutDashboard className="mr-3 h-5 w-5" />
                         Dashboard
                     </Button>
                 </Link>
-                <Link href="/textbooks">
+                <Link href="/dashboard/textbooks">
                     <Button variant="ghost" className="w-full justify-start text-gray-600 hover:bg-gray-50 hover:text-gray-900">
                         <BookOpen className="mr-3 h-5 w-5" />
                         My Textbooks
                     </Button>
                 </Link>
+                <Link href="/dashboard/study-history">
+                    <Button variant="ghost" className="w-full justify-start text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                        <BookOpen className="mr-3 h-5 w-5" />
+                        Study History
+                    </Button>
+                </Link>
+                
             </nav>
 
             <div className="p-4 space-y-2 border-t border-gray-50">
