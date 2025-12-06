@@ -78,7 +78,7 @@ export async function signUp(
         uid: userCredential.user.uid,
         email: userCredential.user.email || email,
         displayName,
-        photoURL: userCredential.user.photoURL || null,
+        photoURL: userCredential.user.photoURL ?? undefined,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
